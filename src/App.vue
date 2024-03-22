@@ -1,50 +1,44 @@
 <template>
-  <div>
-    <input type="text" v-model="user_phone_number">
-    {{ state.connected }}
-    <button id="sign-in-button" type="submit" @click="onSignInSubmit"> SIGN IN BUTTON </button>
+  <AppLogin v-if="!isAuthenticated"></AppLogin>
+  <div class="app-container flex flex-row-reverse" v-else>
+    <AppChat id="AppChat" class="overflow-hidden" :propChat="generalStore.active_chat"></AppChat>
+    <AppActiveChats class="w-[0px] overflow-hidden" id="AppActiveChats"></AppActiveChats>
   </div>
+
 </template>
 
 <script setup>
+import AppChat from './components/AppChat.vue'
+import AppLogin from './components/AppLogin.vue'
+import AppContacts from './components/AppActiveChats.vue'
 import { db, auth } from './firebase'
 import { ref, onMounted } from 'vue'
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { collection, doc } from 'firebase/firestore'
+import { getAuth, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import { state, socket } from './socket';
-const user_phone_number = ref('')
+import { useGeneralStore } from './stores/generalStore'
+import { useAuth } from '@vueuse/firebase/useAuth'
+import { useFirestore } from '@vueuse/firebase/useFirestore'
+import AppActiveChats from './components/AppActiveChats.vue';
+const { isAuthenticated, user } = useAuth(auth)
+const generalStore = useGeneralStore()
 let appVerifier
 
+
 onMounted(() => {
-  console.log(socket)
-  socket.connect()
-  appVerifier = new RecaptchaVerifier(auth, 'sign-in-button', {
-    'size': 'invisible',
-    'callback': (response) => {
+  // socket.connect()
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const userRef = doc(db, 'users', user.uid)
+      console.log(user)
+      generalStore.user = useFirestore(userRef)
+      console.log(useFirestore(userRef))
+    } else {
+      console.log('no user')
     }
   });
-})
+});
 
-const onSignInSubmit = () => {
-
-  signInWithPhoneNumber(auth, user_phone_number.value, appVerifier)
-    .then((confirmationResult) => {
-      window.confirmationResult = confirmationResult;
-      const code = prompt("Please enter the verification code sent to your phone:");
-      if (code) {
-        // If the user provided a code, proceed with confirmation
-        return confirmationResult.confirm(code);
-      } else {
-        // If the user cancels the prompt or doesn't enter a code, handle it accordingly
-        throw new Error("Verification code is required.");
-      }
-    }).then((result) => {
-      const user = result.user;
-      console.log("User signed in successfully:", user);
-    }).
-    catch((error) => {
-      console.log(error)
-    });
-}
 
 
 </script>
